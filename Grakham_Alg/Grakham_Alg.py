@@ -1,4 +1,6 @@
 
+import time
+import math
 import random as rnd
 from operator import itemgetter
 import matplotlib.pyplot as plt
@@ -33,15 +35,19 @@ def Graham(points):
     points.sort(key = lambda x: (x[0], x[1]))
     start_p = points[0]
     shell.append(points[0])
-    points.pop(0)
-    while points[1][0] == start_p[0]:
-        points.pop(0)
-    if points[0][0] == start_p[0]:
-        shell.append(points[0])
-        points.pop(0)
+    #points.pop(0)
+    ind = 1
+    while points[ind][0] == start_p[0]:
+        ind = ind + 1
+    if ind > 1:
+        shell.append(points[ind - 1])
+        #points.pop(0)
+
+    l = len(points)
 
     #сортировка точек по полярному углу относительно стартовой точки
-    points = sorted(points, reverse = True, key = lambda x: (x[1] - shell[0][1]) / (x[0] - shell[0][0]))
+    points = sorted(points[ind:l], reverse = True, key = lambda x: (x[1] - shell[0][1]) / (x[0] - shell[0][0]))
+    #points = sorted(points, reverse = True, key = lambda x: math.atan2((x[1] - shell[0][1]), (x[0] - shell[0][0])))
     points.append(start_p)
 
     #проверка положения точек относительно прямой, проходящей через уже добавленые в оболочку точки
@@ -66,37 +72,43 @@ def Jarvis(points):
     shell = []
 
     #нахождение самой левой нижней(стартовой) и самой правой верхней(граничной) точек, добавление ее и точки с наибольшим У, лежащей с ней на однои вертикальной прямой в оболочку, если такая есть
-    points.sort(key = lambda x: (x[0], x[1]))
-    start_p = points[0]
-    shell.append(points[0])
-    points.pop(0)
-    while points[1][0] == start_p[0]:
-        points.pop(0)
-    if points[0][0] == start_p[0]:
-        shell.append(points[0])
-        points.pop(0)
-    border_p = points[len(points) - 1]
+    start_p = min(points, key = lambda x : (x[0], x[1]))
+    shell.append(start_p)
+    next_p = max(points, key = lambda x: (x!=start_p, math.atan2((x[0] - start_p[0]), -(x[1] - start_p[1]))))
+    shell.append(next_p)
+    border_p = max(points, key = lambda x : (x[0], x[1]))
+    border_i = len(points) + 1
 
     points.append(start_p)
-    i = len(shell) - 1
+    sh = len(shell) - 1
     f = True
 
     #нахождение точки с максимальным полярным углом относительно текущей точки
     #при движении от стартовой к граничной точке рссматриваются только точки лежащие правее текущей, при движении от граничной к стартовой - только лежащие левее 
-    while(True):
-        if (f == True):
-            point = max(points, key = lambda x: (x[0] > shell[i][0], (x[1] - shell[i][1]) / (x[0] - shell[i][0] if x[0] != shell[i][0] else 1e-19)))
-        else: 
-            point = max(points, key = lambda x: (x[0] <= shell[i][0], (x[1] - shell[i][1]) / (x[0] - shell[i][0] if x[0] != shell[i][0] else 1e-19)))
-        shell.append(point)
-        points.remove(point)
-        i = i + 1
+    for k in range(0, border_i):
+        prev = shell[sh]
+        maxangle = -10
+        for i in range(k, border_i): 
+            if (f == True):
+                if (points[i][0] < prev[0]):
+                    continue
+            else:
+                if (points[i][0] > prev[0]):
+                    continue
+            angle = math.atan2((points[i][0] - prev[0]), -(points[i][1] - prev[1]))
+            if (angle > maxangle):
+                        maxangle = angle
+                        t = points[i]
+                        points[i] = points[k]
+                        points[k] = t
+        shell.append(points[k])
+        sh = sh + 1
         #изменение условия
-        if (point == border_p):
-            f = False
+        if (shell[sh] == border_p):
+           f = False
         #конец цикла
-        if(point == start_p):
-            break
+        if(shell[sh] == start_p):
+           break
 
     #возврат построенной оболочки
     return shell
@@ -106,17 +118,17 @@ def FastShell(points):
     shell = []
 
     #нахождение самой левой нижней(стартовой) и самой правой верхней(граничной) точек
-    points.sort(key = lambda x: (x[0], x[1]))
-    left_p = points[0]
-    right_p = points[len(points) - 1]
-    points.pop(0)
-    points.pop(len(points) - 1)
+    #points.sort(key = lambda x: (x[0], x[1]))
+    left_p = min(points, key = lambda x : (x[0], x[1]))
+    right_p = max(points, key = lambda x : (x[0], x[1]))
+    #points.pop(0)
+    #points.pop(len(points) - 1)
 
     #добавление точек в оболочку через вспомогательную функцию FShelp
     shell.append(left_p)
     FShelp(left_p, right_p, points, shell)
     shell.append(right_p)
-    points.reverse()
+    #points.reverse()
     FShelp(right_p, left_p, points, shell)
     shell.append(left_p)
 
@@ -140,13 +152,147 @@ def FShelp(a, b, points, shell):
     if (max <= 0):
         return
 
+    leftP = 0
+    rightP = l-1
+    left = []
+    right = []
+    i = 0
+    while (i < l):
+
+        q = (b[0] - points[imax][0]) * (points[i][1] - points[imax][1])
+        p = (b[1] - points[imax][1]) * (points[i][0] - points[imax][0])
+        cur_h = (q - p)
+        if (cur_h > 0):
+            #if (i!=rightP):
+            #    t = points[i]
+            #    points[i] = points[rightP]
+            #    points[rightP] = t
+            #rightP = rightP - 1
+            right.append(points[i])
+        q = (points[imax][0] - a[0]) * (points[i][1] - a[1])
+        p = (points[imax][1] - a[1]) * (points[i][0] - a[0])
+        cur_h = (q - p)
+        if (cur_h > 0):
+                #if (i!=leftP):
+                #    t = points[i]
+                #    points[i] = points[leftP]
+                #    points[leftP] = t
+                #leftP = leftP + 1
+            left.append(points[i])
+        i = i + 1
+
     #Делает то же самое, но для прямой a->Pmax
-    FShelp(a, points[imax], points[0:imax], shell)
+    #FShelp(a, points[imax], points[0:leftP], shell)
+    FShelp(a, points[imax], left, shell)
     #добавляет в оболочку Pmax
     shell.append(points[imax])
     #Делает то же самое, но для прямой Pmax->b
-    FShelp(points[imax], b, points[imax + 1: l], shell)
+    #FShelp(points[imax], b, points[rightP + 1: l], shell)
+    FShelp(points[imax], b, right, shell)
 
+def Chen(points, m):
+    #
+    shell = []
+    Gshells = []
+    n = len(points)
+    r = n // m
+    startp = min(points, key = lambda x: (x[0], x[1]))
+    for i in range (0, r):
+        Gshells[i] = Graham(points[i * m: (i + 1) * m - 1])
+    
+    return shell
+
+def ProxyShell(points, k):
+    #
+    shell = []
+    for i in range(0, 2 * k + 3):
+        shell.append(0)
+    left_p = min(points, key = lambda x : (x[0], x[1]))
+    right_p = max(points, key = lambda x : (x[0], x[1]))
+    d = (right_p[0] - left_p[0]) / k
+    for point in points:
+        num = math.floor((point[0] - left_p[0]) / d)
+        if (point == left_p or point == right_p):
+            continue
+        if (shell[num + 1] == 0 or point[1] < shell[num + 1][1]):
+            shell[num + 1] = point
+        elif(shell[2 * k + 1 - num] == 0 or point[1] > shell[2 * k + 1 - num][1]):
+            shell[2 * k + 1 - num] = point
+    shell[k + 1] = right_p
+    shell[0] = left_p
+    shell[2 * k + 2] = left_p
+    i = 0
+    l = len(shell)
+    while(i < l):
+        if (shell[i] == 0):
+            shell.pop(i)
+            l = l - 1
+        else:
+            i = i + 1
+    return shell
+
+
+
+def bench():
+    file = open("bench.txt", 'w')
+    i = 1000
+    while (i <= 100000):
+        points = []
+        for j in range(0, i):
+            x = rnd.random()
+            y = rnd.random()
+            points.append([x, y])
+        start_time = time.time()
+        Graham(points)
+        end_time = time.time() - start_time
+        file.write(str(end_time))
+        file.write(" ")
+        start_time = time.time()
+        Jarvis(points)
+        end_time = time.time() - start_time
+        file.write(str(end_time))
+        file.write(" ")
+        start_time = time.time()
+        FastShell(points)
+        end_time = time.time() - start_time
+        file.write(str(end_time))
+        file.write(" ")
+        start_time = time.time()
+        ProxyShell(points, 100)
+        end_time = time.time() - start_time
+        file.write(str(end_time))
+        file.write(" ")
+        file.write("\n")
+        print(str(i))
+        i = i + 1000
+    file.close
+    return
+
+plt.rcParams['figure.figsize'] = [16, 9]
+
+bench()
+
+G = []
+J = []
+F = []
+P = []
+I = []
+for i in range (0, 100):
+    I.append((i + 1) * 1000)
+
+file = open("bench.txt", 'r')
+for line in file:
+            point = line.split()
+            G.append(float(point[0]))
+            J.append(float(point[1]))
+            F.append(float(point[2]))
+            P.append(float(point[3]))
+file.close
+
+plt.plot(I, G, 'r', I, J, 'b', I, F, 'g', I, P, 'y')
+
+
+plt.show()
 
 print("Options of data filling:\n 1. Read from file\n 2. Randomize n points\n 3. Type n points\n Choose ant type a number\n\n")
 case = int(input())
@@ -178,23 +324,37 @@ elif case == 3:
         point = input().split()
         points.append([float(point[0]), float(point[1])])
 
-copy_p = points.copy()
+#copy_p = points.copy()
 
-print("Options of algorithms:\n 1. Graham\n 2. Jarvis\n 3. Fast Shell\n Choose ant type a number\n\n")
+print("Options of algorithms:\n 1. Graham\n 2. Jarvis\n 3. Fast Shell\n 4. ProxyShell\n Choose ant type a number\n\n")
 case = int(input())
 
 #выбор алгоритма:
 if case == 1:
-    shell = Graham(copy_p)
+    start_time = time.time()
+    shell = Graham(points)
+    end_time = time.time() - start_time
+    print (end_time)
 elif case == 2:
-    shell = Jarvis(copy_p)
+    start_time = time.time()
+    shell = Jarvis(points)
+    end_time = time.time() - start_time
+    print (end_time)
 elif case == 3:
-    shell = FastShell(copy_p)
+    start_time = time.time()
+    shell = FastShell(points)
+    end_time = time.time() - start_time
+    print (end_time)
+elif case == 4:
+    start_time = time.time()
+    shell = ProxyShell(points, 100)
+    end_time = time.time() - start_time
+    print (end_time)
 
 #запись оболочки в файл и ее вывод на консоль
 write_in_file("answer.txt", shell)
-for coord in shell:
-    print(coord)
+#for coord in shell:
+    #print(coord)
 
 #визуализация оболочки
 x = []
@@ -212,7 +372,7 @@ for point in shell:
 
 
 #plt.style.use('_mpl-gallery')
-plt.rcParams['figure.figsize'] = [16, 9]
+
 
 # make data
 plt.plot(x, y, 'ro', x_shell, y_shell, 'bo', x_shell, y_shell)
